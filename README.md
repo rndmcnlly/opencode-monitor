@@ -14,14 +14,20 @@ Run `npm install` in this checkout, then open a **new V2 session** rooted at `de
 
 You should see individual synthetic monitor inputs wake the agent while the command is still running. Native shell completion sends its own final input containing the full output.
 
-## Intended package installation
+## Install from GitHub with V2's plugin manager
 
-To try this checkout in another **V2** project after installing dependencies, add its path to that project's configuration:
+OpenCode V2 accepts Git repositories as plugin sources, so no npm publication is needed:
+
+```sh
+opencode plugin add github:rndmcnlly/opencode-monitor#main
+```
+
+To scope it to one V2 project instead, put the same Git source in that project's `opencode.jsonc`:
 
 ```jsonc
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["/path/to/opencode-monitor"]
+  "plugins": ["github:rndmcnlly/opencode-monitor#main"]
 }
 ```
 
