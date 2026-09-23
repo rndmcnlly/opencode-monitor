@@ -6,10 +6,9 @@ import { stat } from "node:fs/promises"
 const TICK_MS = 200
 const MAX_LINE = 16_384
 const MAX_EVENTS = 100
-const WATCH_MS = 300_000
 
 type ShellInput = { command: string; background?: boolean; monitor?: boolean; [key: string]: unknown }
-type Job = { stop: () => void }
+type Job = { stop: () => void; finish: () => Promise<void> }
 
 /** A newline is the only event delimiter. A partial final line is delivered at EOF. */
 export function lines(onLine: (line: string) => void) {
@@ -50,12 +49,13 @@ function artifact(value: unknown): { file: string; id: string } | undefined {
   if (typeof file === "string" && file.endsWith(`/${id}.out`)) return { file, id }
 }
 
-/** Follow the output artifact of a native background shell for one bounded watch. */
+/** Follow the output artifact until the native shell exits or the plugin unloads. */
 function follow(file: string, emit: (line: string) => Promise<void>, done: () => void): Job {
   let stopped = false
   let offset = 0
   let count = 0
   let busy = false
+  let active: Promise<void> | undefined
   let delivery = Promise.resolve()
   const decoder = new TextDecoder()
   const send = (line: string) => {
@@ -74,11 +74,10 @@ function follow(file: string, emit: (line: string) => Promise<void>, done: () =>
     if (stopped) return
     stopped = true
     clearInterval(timer)
-    clearTimeout(deadline)
     done()
   }
-  const tick = async () => {
-    if (busy || stopped) return
+  const read = async () => {
+    if (stopped) return
     busy = true
     try {
       const size = (await stat(file)).size
@@ -95,16 +94,50 @@ function follow(file: string, emit: (line: string) => Promise<void>, done: () =>
       }
     } finally { busy = false }
   }
+  const tick = () => {
+    if (busy || stopped) return active ?? Promise.resolve()
+    active = read().finally(() => { active = undefined })
+    return active
+  }
   const timer = setInterval(() => void tick(), TICK_MS)
-  const deadline = setTimeout(() => { stop(); send("[monitor watch expired after 5 minutes; the shell process may still be running]") }, WATCH_MS)
   void tick()
-  return { stop }
+  return {
+    stop,
+    async finish() {
+      if (stopped) return
+      await tick()
+      if (stopped) return
+      framing.push(decoder.decode())
+      framing.finish()
+      stop()
+      await delivery
+    },
+  }
 }
 
 export default Plugin.define({
   id: "opencode-monitor",
   async setup(ctx) {
-    const jobs = new Set<Job>()
+    const jobs = new Map<string, Job>()
+    const exited = new Set<string>()
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+          if (event.location?.directory !== ctx.location.directory) continue
+          if (event.type !== "shell.exited" && event.type !== "shell.deleted") continue
+          const id = event.data.id
+          const job = jobs.get(id)
+          if (job) await job.finish()
+          else {
+            exited.add(id)
+            if (exited.size > 1_000) exited.delete(exited.values().next().value!)
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) console.error("monitor event stream failed", error)
+      }
+    })()
     await ctx.tool.transform((editor) => {
       const shell = editor.get("shell")
       if (!shell) return
@@ -124,10 +157,10 @@ export default Plugin.define({
           ...base,
           properties: {
             ...(base.properties as Record<string, unknown>),
-            monitor: { type: "boolean", description: "Deliver each output line as a session event for up to five minutes. Requires explicit background: true. Filter noisy output in the command." },
+            monitor: { type: "boolean", description: "Deliver each output line as a session event while the background shell runs. Requires explicit background: true. Use shell's existing timeout to limit the job." },
           },
         }
-        tool.description += "\nTo monitor a command, set both background: true and monitor: true. Monitoring a foreground command is rejected before launch. Each output line becomes a session event for five minutes; ordinary shell permissions still apply."
+        tool.description += "\nTo monitor a command, set both background: true and monitor: true. Monitoring a foreground command is rejected before launch. Lines arrive while the native shell runs; its existing timeout controls the duration. Background shells have no timeout by default. Ordinary shell permissions still apply."
         tool.execute = async (raw, context) => {
           const input = raw as ShellInput
           if (input.monitor !== true) return execute(raw, context)
@@ -143,12 +176,17 @@ export default Plugin.define({
           const sessionID = context.sessionID
           const job = follow(source.file, async (line) => {
             await ctx.session.synthetic({ sessionID, text: `[monitor ${source.id}] ${line}`, description: "Monitor output", delivery: "steer" })
-          }, () => jobs.delete(job))
-          jobs.add(job)
+          }, () => jobs.delete(source.id))
+          jobs.set(source.id, job)
+          if (exited.delete(source.id)) void job.finish()
           return result
         }
       })
     })
-    return () => { for (const job of jobs) job.stop() }
+    return () => {
+      controller.abort()
+      for (const job of jobs.values()) job.stop()
+      jobs.clear()
+    }
   },
 })

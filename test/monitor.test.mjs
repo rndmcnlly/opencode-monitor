@@ -24,6 +24,8 @@ test("monitor wraps native shell and admits each line to the firing session", as
   await writeFile(file, "")
   const received = []
   const calls = []
+  let events
+  const stream = new ReadableStream({ start(controller) { events = controller } })
   let tool = {
     id: "shell", name: "shell", description: "native shell",
     input: Schema.Struct({ command: Schema.String, background: Schema.optional(Schema.Boolean) }),
@@ -33,6 +35,11 @@ test("monitor wraps native shell and admits each line to the firing session", as
     },
   }
   const cleanup = await plugin.setup({
+    location: { directory: dir },
+    event: { subscribe: ({ signal }) => {
+      signal.addEventListener("abort", () => events.close(), { once: true })
+      return stream
+    } },
     tool: { transform: async (callback) => {
       callback({ get: () => tool, update: (_id, edit) => edit(tool) })
     } },
@@ -48,12 +55,17 @@ test("monitor wraps native shell and admits each line to the firing session", as
       /requires explicit background: true; command was not launched/,
     )
     assert.deepEqual(calls, [])
-    await tool.execute({ command: "printf 'hello\\n'", background: true, monitor: true }, { sessionID: "ses_example" })
+    const timeout = 8 * 60 * 60 * 1000
+    await tool.execute({ command: "printf 'hello\\n'", background: true, monitor: true, timeout }, { sessionID: "ses_example" })
     await appendFile(file, "first\nsecond\n")
     await new Promise((resolve) => setTimeout(resolve, 450))
-    assert.deepEqual(calls, [{ command: "printf 'hello\\n'", background: true }])
+    assert.deepEqual(calls, [{ command: "printf 'hello\\n'", background: true, timeout }])
     assert.deepEqual(received.map((item) => item.text), ["[monitor sh_example] first", "[monitor sh_example] second"])
     assert.ok(received.every((item) => item.sessionID === "ses_example" && item.delivery === "steer"))
+    await appendFile(file, "last without newline")
+    events.enqueue({ type: "shell.exited", location: { directory: dir }, data: { id: "sh_example" } })
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    assert.equal(received.at(-1).text, "[monitor sh_example] last without newline")
     await tool.execute({ command: "pwd" }, { sessionID: "ses_example" })
     assert.deepEqual(calls[1], { command: "pwd" })
   } finally {
