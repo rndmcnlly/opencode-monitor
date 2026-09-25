@@ -175,7 +175,7 @@ export default Plugin.define({
           }
           const sessionID = context.sessionID
           const job = follow(source.file, async (line) => {
-            await ctx.session.synthetic({ sessionID, text: `[monitor ${source.id}] ${line}`, description: "Monitor output", delivery: "steer" })
+            await ctx.session.synthetic({ sessionID, text: `[monitor ${source.id}] ${line}`, description: "Monitor output", metadata: { source: "opencode-monitor" }, delivery: "steer" })
           }, () => jobs.delete(source.id))
           jobs.set(source.id, job)
           if (exited.delete(source.id)) void job.finish()

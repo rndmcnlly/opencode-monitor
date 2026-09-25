@@ -62,10 +62,12 @@ test("monitor wraps native shell and admits each line to the firing session", as
     assert.deepEqual(calls, [{ command: "printf 'hello\\n'", background: true, timeout }])
     assert.deepEqual(received.map((item) => item.text), ["[monitor sh_example] first", "[monitor sh_example] second"])
     assert.ok(received.every((item) => item.sessionID === "ses_example" && item.delivery === "steer"))
+    assert.ok(received.every((item) => item.metadata?.source === "opencode-monitor"))
     await appendFile(file, "last without newline")
     events.enqueue({ type: "shell.exited", location: { directory: dir }, data: { id: "sh_example" } })
     await new Promise((resolve) => setTimeout(resolve, 100))
     assert.equal(received.at(-1).text, "[monitor sh_example] last without newline")
+    assert.deepEqual(received.at(-1).metadata, { source: "opencode-monitor" })
     await tool.execute({ command: "pwd" }, { sessionID: "ses_example" })
     assert.deepEqual(calls[1], { command: "pwd" })
   } finally {
