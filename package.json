@@ -6,7 +6,10 @@
   "exports": "./src/index.ts",
   "scripts": {
     "check": "tsc --noEmit",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "build:extension": "npm --prefix openchamber-extension run build",
+    "check:extension": "npm --prefix openchamber-extension run check",
+    "connect:openchamber": "node openchamber-extension/connect.mjs"
   },
   "dependencies": {
     "@opencode/plugin": "^2.0.15",

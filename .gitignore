@@ -1,2 +1,4 @@
 node_modules/
 dist/
+openchamber-extension/panel/main.js
+openchamber-extension/service/main.js

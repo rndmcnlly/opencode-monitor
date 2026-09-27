@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Background jobs</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header id="toolbar">
+      <strong>Background jobs</strong>
+      <div class="controls">
+        <button id="expand">Expand all</button>
+        <button id="collapse">Collapse all</button>
+        <button id="auto" aria-pressed="false">Auto-collapse</button>
+      </div>
+    </header>
+    <p id="summary" aria-live="polite">Open a conversation to see its jobs.</p>
+    <p id="notice" role="status" hidden></p>
+    <main id="jobs" tabindex="0" aria-label="Background jobs"></main>
+    <script src="main.js"></script>
+  </body>
+</html>
