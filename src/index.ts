@@ -120,6 +120,7 @@ export default Plugin.define({
   async setup(ctx) {
     const jobs = new Map<string, Job>()
     const exited = new Set<string>()
+    const tippedSessions = new Set<string>()
     const controller = new AbortController()
     void (async () => {
       try {
@@ -163,7 +164,22 @@ export default Plugin.define({
         tool.description += "\nTo monitor a command, set both background: true and monitor: true. Monitoring a foreground command is rejected before launch. Lines arrive while the native shell runs; its existing timeout controls the duration. Background shells have no timeout by default. Ordinary shell permissions still apply."
         tool.execute = async (raw, context) => {
           const input = raw as ShellInput
-          if (input.monitor !== true) return execute(raw, context)
+          if (input.monitor !== true) {
+            const started = performance.now()
+            const result = await execute(raw, context)
+            const elapsed = performance.now() - started
+            if (input.background === true || elapsed <= 10_000) return result
+            let notice = `[opencode-monitor] Foreground shell took ${(elapsed / 1000).toFixed(1)} seconds.`
+            if (elapsed > 30_000 && !tippedSessions.has(context.sessionID)) {
+              tippedSessions.add(context.sessionID)
+              notice += " Tip: use background: true for similar long-running commands to continue other work; add monitor: true for live output updates. Completion is reported automatically; no polling needed."
+            }
+            return {
+              ...result,
+              content: [...(Array.isArray(result.content) ? result.content : [{ type: "text" as const, text: String(result.content ?? "") }]),
+                { type: "text" as const, text: notice }],
+            }
+          }
           if (input.background !== true) throw new Error("monitor: true requires explicit background: true; command was not launched")
           const { monitor: _, ...shellInput } = input
           const result = await execute(shellInput, context)

@@ -27,6 +27,8 @@ shell({ command: "tail -f app.log | grep --line-buffered ERROR", background: tru
 
 Each line of output becomes an update in the conversation. Filter noisy commands so the updates stay useful. OpenCode still notifies the session when the command finishes.
 
+Foreground `shell` calls lasting more than 10 seconds get a short runtime note in their tool result. The first call exceeding 30 seconds in each session also gets a tip suggesting `background: true` for similar commands and `monitor: true` for live progress updates. Subsequent calls report only their runtime. This applies whether `background` was omitted or explicitly false; background calls receive neither. Tip tracking lasts for the plugin instance's lifetime.
+
 ## OpenChamber background-jobs panel
 
 The optional [OpenChamber extension](./openchamber-extension/README.md) brings back Perk's job cards for V2. It shows background shell jobs in the current session and its recursive subagent sessions, including jobs without `monitor: true`. Monitored jobs have an amber edge and **MONITOR** badge, so long-lived watches are easy to find and stop.
