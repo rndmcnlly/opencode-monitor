@@ -8,7 +8,6 @@
   </head>
   <body>
     <header id="toolbar">
-      <strong>Background jobs</strong>
       <div class="controls">
         <button id="expand">Expand all</button>
         <button id="collapse">Collapse all</button>
@@ -18,7 +17,18 @@
     </header>
     <p id="summary" aria-live="polite">Open a conversation to see its jobs.</p>
     <p id="notice" role="status" hidden></p>
-    <main id="jobs" tabindex="0" aria-label="Background jobs"></main>
+    <main id="jobs" tabindex="0" aria-label="Shell jobs">
+      <section id="foreground-zone" aria-label="Foreground commands" hidden>
+        <h2>Foreground commands</h2>
+        <p id="foreground-empty">Foreground commands show here. If one lingers, consider asking the agent to run it in the background next time.</p>
+        <div id="foreground-jobs" class="job-list"></div>
+      </section>
+      <section aria-label="Background jobs">
+        <h2 id="background-heading" hidden>Background jobs</h2>
+        <p id="background-empty" hidden>Background shell commands from this session and its subagents show here, including completed jobs.</p>
+        <div id="background-jobs" class="job-list"></div>
+      </section>
+    </main>
     <script src="main.js"></script>
   </body>
 </html>

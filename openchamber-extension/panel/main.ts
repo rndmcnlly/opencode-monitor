@@ -3,7 +3,12 @@ import { applyHostReady } from "@openchamber/sdk/ui"
 import type { Job, Snapshot } from "../jobs.js"
 
 const host = connectHost()
-const root = document.querySelector<HTMLElement>("#jobs")!
+const foregroundZone = document.querySelector<HTMLElement>("#foreground-zone")!
+const foregroundEmpty = document.querySelector<HTMLElement>("#foreground-empty")!
+const foregroundRoot = document.querySelector<HTMLElement>("#foreground-jobs")!
+const backgroundRoot = document.querySelector<HTMLElement>("#background-jobs")!
+const backgroundHeading = document.querySelector<HTMLElement>("#background-heading")!
+const backgroundEmpty = document.querySelector<HTMLElement>("#background-empty")!
 const summary = document.querySelector<HTMLElement>("#summary")!
 const notice = document.querySelector<HTMLElement>("#notice")!
 const automatic = document.querySelector<HTMLButtonElement>("#auto")!
@@ -97,6 +102,8 @@ function makeCard(job: Job): Card {
 }
 function paint(jobs: Job[]) {
   let changed = false
+  let foregroundIndex = 0
+  let backgroundIndex = 0
   const retained = new Set(jobs.map((job) => job.id))
   for (const [id, card] of cards) if (!retained.has(id)) { card.element.remove(); cards.delete(id) }
   for (const job of jobs) {
@@ -117,9 +124,12 @@ function paint(jobs: Job[]) {
     card.stop.hidden = !running || job.foreground === true
     fold(card)
     // Keyed DOM preserves open details, output selection, scroll, and focus.
-    const desiredIndex = jobs.indexOf(job)
-    if (root.children[desiredIndex] !== card.element) root.insertBefore(card.element, root.children[desiredIndex] ?? null)
+    const container = job.foreground ? foregroundRoot : backgroundRoot
+    const desiredIndex = job.foreground ? foregroundIndex++ : backgroundIndex++
+    if (container.children[desiredIndex] !== card.element) container.insertBefore(card.element, container.children[desiredIndex] ?? null)
   }
+  foregroundEmpty.hidden = foregroundIndex > 0
+  backgroundEmpty.hidden = backgroundIndex > 0
   if (changed) persist()
 }
 async function readOutput(card: Card) {
@@ -161,19 +171,21 @@ async function refresh() {
   finally { busy = false }
 }
 function render(sessions: number) {
+  foregroundZone.hidden = !showForeground
+  backgroundHeading.hidden = !showForeground
   const visible = currentJobs.filter((job) => showForeground || !job.foreground)
   paint(visible)
   const active = visible.filter((job) => job.status === "running")
   const foregroundCount = currentJobs.filter((job) => job.foreground).length
-  summary.textContent = `${active.length} running · ${active.filter((job) => job.monitored).length} monitored · ${foregroundCount} foreground${showForeground ? "" : " hidden"} · ${sessions} session${sessions === 1 ? "" : "s"} (including subagents)`
-  if (!visible.length) summary.textContent += " · No visible jobs."
+  const foregroundSummary = showForeground ? ` · ${foregroundCount} foreground` : foregroundCount ? ` · ${foregroundCount} foreground hidden` : ""
+  summary.textContent = `${active.length} running · ${active.filter((job) => job.monitored).length} monitored${foregroundSummary} · ${sessions} session${sessions === 1 ? "" : "s"} (including subagents)`
   void Promise.all([...cards.values()].map(readOutput))
 }
 foregroundToggle.onclick = () => {
   showForeground = !showForeground
   foregroundToggle.setAttribute("aria-pressed", String(showForeground))
   void host.storage.set("show-foreground", showForeground).catch((e) => showNotice(String(e)))
-  render(currentSessions)
+  if (sessionID) render(currentSessions)
 }
 let currentSessions = 0
 document.querySelector<HTMLButtonElement>("#expand")!.onclick = () => { collapsed.clear(); cards.forEach(fold); persist() }
@@ -193,8 +205,12 @@ host.onSession((session) => {
   ready = false
   currentJobs = []
   currentSessions = 0
+  foregroundZone.hidden = true
+  backgroundHeading.hidden = true
+  backgroundEmpty.hidden = true
   cards.clear()
-  root.replaceChildren()
+  foregroundRoot.replaceChildren()
+  backgroundRoot.replaceChildren()
   collapsed.clear()
   showNotice("")
   summary.textContent = next ? "Loading session tree…" : "Open a conversation to see its jobs."

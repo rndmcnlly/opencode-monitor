@@ -4,7 +4,7 @@ html, body { width: 100%; height: 100%; min-width: 0; margin: 0; overflow: hidde
 body { display: flex; flex-direction: column; padding: 12px; background: var(--oc-bg, #f5f6f8); color: var(--oc-fg, #303540); font: 12px var(--oc-font, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif); }
 [hidden] { display: none !important; }
 #toolbar, .controls, .status-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-#toolbar { flex-shrink: 0; justify-content: space-between; gap: 10px; }
+#toolbar { flex-shrink: 0; justify-content: flex-end; gap: 10px; }
 #summary { flex-shrink: 0; opacity: .7; line-height: 1.5; }
 #notice { flex-shrink: 0; max-height: 25%; overflow: auto; padding: 10px; background: color-mix(in srgb, var(--oc-error, #a44545) 12%, transparent); border-radius: 6px; white-space: pre-wrap; }
 button { color: inherit; font: inherit; padding: 5px 7px; border: 1px solid var(--oc-border, #d5d8df); border-radius: 6px; background: transparent; cursor: pointer; }
@@ -12,7 +12,11 @@ button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 button:disabled { cursor: default; opacity: .5; }
 .controls button { border: 0; }
 button[aria-pressed="true"] { color: var(--oc-primary-text, #345fa5); background: color-mix(in srgb, var(--oc-primary, #5080dd) 15%, transparent); }
-#jobs { flex: 1; min-height: 0; display: grid; grid-auto-rows: max-content; align-content: start; gap: 9px; overflow-y: auto; }
+#jobs { flex: 1; min-height: 0; overflow-y: auto; }
+#jobs h2 { margin: 0 0 9px; font-size: 11px; font-weight: 650; opacity: .7; }
+#foreground-zone { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--oc-border, #d5d8df); }
+#foreground-empty, #background-empty { margin: 0; padding: 8px 10px; color: var(--oc-muted, var(--oc-fg, #303540)); opacity: .7; line-height: 1.5; }
+.job-list { display: grid; grid-auto-rows: max-content; align-content: start; gap: 9px; }
 .job { min-width: 0; overflow: hidden; border: 1px solid var(--oc-border, #d5d8df); border-radius: 7px; background: var(--oc-elevated, #f0f5fb); }
 .job.running { border-left: 4px solid var(--oc-info-text, #3e7295); }
 .card-header { padding: 10px 12px; }

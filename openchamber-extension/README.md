@@ -5,7 +5,7 @@ The companion panel for `opencode-monitor`, adapted from `opencode-perk`'s V1 vi
 ## What the panel shows
 
 - Shell calls launched with `background: true` in the selected session and every descendant linked by `parentID`, across their project directories.
-- Running foreground `shell` calls in the selected session and its descendants, marked **FOREGROUND**. The panel header's **Foreground** toggle shows or hides these cards (on by default, remembered across sessions). An agent or background subagent can be waiting on a foreground command.
+- Running foreground `shell` calls in the selected session and its descendants, marked **FOREGROUND**. The panel header's **Foreground** toggle shows or hides a dedicated zone above background jobs (on by default, remembered across sessions). When empty, the zone suggests asking the agent to background a command that lingers there. An agent or background subagent can be waiting on a foreground command.
 - Running jobs first, with monitored jobs first within that group.
 - A colored edge for running jobs, whether monitored or not. The **MONITOR** badge marks `monitor: true`: monitoring was requested at launch, but notifications may stop at the plugin's line limit while the process keeps running.
 - Command, elapsed time, owning session, exit status, expandable details, and combined stdout/stderr.
