@@ -27,6 +27,7 @@ button[aria-pressed="true"] { color: var(--oc-primary-text, #345fa5); background
 .elapsed, .owner { opacity: .65; }
 .owner { margin-top: 6px; overflow-wrap: anywhere; font-size: 11px; }
 .monitor-badge { color: var(--oc-warning-text, #916014); border: 1px solid currentColor; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+.foreground-badge { color: var(--oc-info-text, #3e7295); border: 1px solid currentColor; padding: 1px 4px; border-radius: 4px; font-size: 10px; font-weight: 700; }
 .stop-control { margin-left: auto; color: var(--oc-error-text, #a44545); background: color-mix(in srgb, var(--oc-error, #a44545) 7%, transparent); border-color: color-mix(in srgb, var(--oc-error, #a44545) 35%, transparent); padding: 5px 9px; font-family: var(--oc-font, sans-serif); font-size: 12px; }
 .program, .output-view { max-width: 100%; margin: 0; padding: 10px 12px; overflow: auto; font: 11px/1.55 var(--oc-mono, monospace); white-space: pre; }
 .program { max-height: 160px; border-top: 1px solid var(--oc-border, #d5d8df); color: var(--oc-primary-text, #345fa5); }

@@ -31,7 +31,7 @@ Foreground `shell` calls lasting more than 10 seconds get a short runtime note i
 
 ## OpenChamber background-jobs panel
 
-The optional [OpenChamber extension](./openchamber-extension/README.md) brings back Perk's job cards for V2. It shows background shell jobs in the current session and its recursive subagent sessions, including jobs without `monitor: true`. Monitored jobs have an amber edge and **MONITOR** badge, so long-lived watches are easy to find and stop.
+The optional [OpenChamber extension](./openchamber-extension/README.md) brings back Perk's job cards for V2. It shows background shell jobs in the current session and its recursive subagent sessions, including jobs without `monitor: true`. It can also show running foreground shell commands in the selected session and its subagents, controlled by the **Foreground** toggle in the panel header. Monitored jobs have a **MONITOR** badge, so long-lived watches are easy to find and stop.
 
 Cards show status, elapsed time, owning session, combined live output, and a Cancel job button that remains accessible on collapsed cards. Completed jobs are recovered from session history when the panel opens. Collapse preferences are saved per session; auto-collapse leaves monitored jobs expanded.
 

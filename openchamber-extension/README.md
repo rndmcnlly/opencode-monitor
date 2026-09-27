@@ -5,11 +5,13 @@ The companion panel for `opencode-monitor`, adapted from `opencode-perk`'s V1 vi
 ## What the panel shows
 
 - Shell calls launched with `background: true` in the selected session and every descendant linked by `parentID`, across their project directories.
+- Running foreground `shell` calls in the selected session and its descendants, marked **FOREGROUND**. The panel header's **Foreground** toggle shows or hides these cards (on by default, remembered across sessions). An agent or background subagent can be waiting on a foreground command.
 - Running jobs first, with monitored jobs first within that group.
 - A colored edge for running jobs, whether monitored or not. The **MONITOR** badge marks `monitor: true`: monitoring was requested at launch, but notifications may stop at the plugin's line limit while the process keeps running.
 - Command, elapsed time, owning session, exit status, expandable details, and combined stdout/stderr.
 - Expand/collapse controls and per-session collapse storage. Auto-collapse closes ordinary completed jobs, keeping monitored jobs visible.
-- A **Cancel job** button in each running card's header, including collapsed cards, routed through OpenCode's native shell removal operation with session-tree and native-owner checks.
+- A **Cancel job** button in each running background card's header, including collapsed cards, routed through OpenCode's native shell removal operation with session-tree and native-owner checks.
+- Foreground cards show live output but cannot be cancelled from the panel: their owning agent is waiting on the tool result. They disappear when the call or native shell finishes.
 - Panel cancellation notifies the owning agent and, for a descendant's job, the session whose panel you used. The message explicitly says a human cancelled the job and not to restart it automatically. Structured cancellation metadata preserves **Cancelled by human** across panel/service reloads. Direct service calls default to an agent actor; the graphical panel explicitly identifies its action as human-initiated.
 
 The panel works for ordinary background shells without the monitor plugin. The plugin supplies incremental conversation notifications; the panel observes native job state independently.
@@ -37,7 +39,7 @@ In **Settings → Extensions → Add**, choose the absolute path of this `opench
 
 **After OpenChamber restarts or changes its backend**, rerun `npm run connect:openchamber`. The service rereads the connection file on requests. This proof of concept selects one OpenChamber backend per OS user. It does not silently fall back to the standalone OpenCode service, which may be a different process with different live jobs.
 
-Rebuild after edits with `npm run build:extension`. Reload the panel for frontend edits; disable and re-enable the extension for service edits. Bundles are generated locally and gitignored. A distributed archive must include both built `main.js` files.
+Rebuild after edits with `npm run build:extension`. Reload the panel for frontend edits; disable and re-enable the extension for service edits. Reloading the web view alone does not restart the service; the panel now warns when its service predates foreground-job support. Bundles are generated locally and gitignored. A distributed archive must include both built `main.js` files.
 
 ## V1 versus V2
 
@@ -56,7 +58,7 @@ The panel retains Perk's card layout, but uses keyed DOM updates so refreshing s
 
 ## Lifecycle limits
 
-- OpenCode's shell list only includes running jobs. The panel instead recovers background shell IDs and monitoring flags from structured tool records, including pages before compaction, then looks up their native status. It never infers IDs from conversation prose. Shells launched outside recorded `shell` tool calls are not included.
+- OpenCode's shell list only includes running jobs. The panel recovers background shell IDs and monitoring flags from structured tool records, including pages before compaction, then looks up their native status. Foreground commands are matched against running `shell` tool calls in the selected session and its descendants by native session owner, command, and launch time (or shell ID when available). They have no historical cards after completion. It never infers IDs from conversation prose. Shells launched outside recorded `shell` tool calls are not included.
 - **Cancellation also removes native output.** Already displayed output stays in the current panel until it reloads. OpenCode 2.0.16 also emits `Shell.NotFoundError` to the conversation when a background tool's shell is removed this way, although the process has been stopped. The panel sends its explicit cancellation notice after successful removal to explain the intent. If notification fails, the panel reports that cancellation succeeded but agent notification could not be confirmed; it does not claim the stop failed or retry it.
 - Native shell records can expire. The panel recovers exit codes and cancellation provenance from structured metadata in synthetic session messages, even after the live record is gone. Output then shows as no longer retained. Completion-message delivery can lag behind process exit, so its timestamp is not used to invent an elapsed duration. Missing records with no recorded exit code or cancellation notice stay visible as **Record unavailable**. Cancellation provenance becomes recoverable when the notice appears in the owning session's history.
 - Perk's estimated duration, separate progress channel, and friendly launch label have no equivalents in the native shell records used here. Titles show the first command line and elapsed time is actual wall time.

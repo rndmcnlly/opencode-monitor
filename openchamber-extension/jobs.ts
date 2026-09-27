@@ -7,18 +7,19 @@ export type Shell = {
 }
 export type Job = {
   id: string; sessionID: string; sessionTitle: string; directory: string
-  command: string; monitored: boolean; started: number; completed?: number
+  command: string; monitored: boolean; foreground?: boolean; started: number; completed?: number
   status: Shell["status"] | "unavailable"; exit?: number; file?: string; cwd?: string
   retained?: boolean
   cancelledBy?: "human" | "agent"
   notificationError?: string
 }
-export type Snapshot = { jobs: Job[]; sessions: number; warnings: string[] }
+export type Snapshot = { jobs: Job[]; sessions: number; warnings: string[]; foregroundSupported: true }
 export type Page<T> = { data: T[]; cursor?: { next?: string } }
 export type Api = <T>(path: string, query?: Record<string, string>, method?: string, body?: unknown) => Promise<T>
 
 type Message = { id: string; content?: unknown[]; metadata?: Record<string, unknown> }
 type Candidate = { id: string; command: string; monitored: boolean; started: number }
+type ForegroundCall = { command: string; started: number; shellID?: string }
 
 /** Read structured tool records, never shell IDs mentioned in prose/output. */
 export function candidates(message: Message): Candidate[] {
@@ -34,9 +35,24 @@ export function candidates(message: Message): Candidate[] {
   return result
 }
 
+function foregroundCalls(message: Message): ForegroundCall[] {
+  const result: ForegroundCall[] = []
+  for (const raw of message.content ?? []) {
+    const part = raw as { type?: string; name?: string; state?: { status?: string; input?: Record<string, unknown>; metadata?: Record<string, unknown> }; time?: { ran?: number; created?: number } }
+    if (part.type !== "tool" || part.name !== "shell" || !["running", "streaming"].includes(part.state?.status ?? "")) continue
+    const input = part.state?.input
+    if (input?.background === true || typeof input?.command !== "string") continue
+    result.push({ command: input.command, started: part.time?.ran ?? part.time?.created ?? 0,
+      shellID: typeof part.state?.metadata?.shellID === "string" ? part.state.metadata.shellID : undefined })
+  }
+  return result
+}
+
 /** A per-service read model. Native OpenCode remains the process owner. */
 export class Jobs {
   private histories = new Map<string, { head?: string; completionHead?: string; jobs: Map<string, Job>; exits: Map<string, number> }>()
+  private foreground = new Map<string, Map<string, Job>>()
+  private activeCalls = new Map<string, Map<string, ForegroundCall[]>>()
   constructor(private api: Api) {}
 
   private async tree(root: string): Promise<Session[]> {
@@ -63,12 +79,17 @@ export class Jobs {
     let cursor: string | undefined
     let head: string | undefined
     let reached = false
+    let active = this.activeCalls.get(session.id)
+    if (!active) { active = new Map(); this.activeCalls.set(session.id, active) }
     do {
       const page: Page<Message> = await this.api<Page<Message>>(`/api/session/${session.id}/message`, {
         type: "assistant", limit: history.head ? "10" : "100", ...(cursor ? { cursor } : { order: "desc" }),
       })
       head ??= page.data[0]?.id
       for (const message of page.data) {
+        const calls = foregroundCalls(message)
+        if (calls.length) active.set(message.id, calls)
+        else active.delete(message.id)
         for (const job of candidates(message)) if (!history.jobs.has(job.id)) {
           history.jobs.set(job.id, { ...job, sessionID: session.id, sessionTitle: session.title ?? session.id, directory: session.location.directory, status: "unavailable" })
         }
@@ -102,16 +123,18 @@ export class Jobs {
       cursor = page.cursor?.next
     } while (cursor && !reached)
     history.completionHead = head
-    return history
+    return { history, active: [...active.values()].flat() }
   }
 
   async list(root: string): Promise<Snapshot> {
     const sessions = await this.tree(root)
     const jobs: Job[] = []
     const warnings: string[] = []
+    const runningByDirectory = new Map<string, Shell[]>()
     for (const session of sessions) {
       try {
-        const history = await this.history(session)
+        const { history, active } = await this.history(session)
+        this.foreground.delete(session.id)
         for (const job of history.jobs.values()) {
           if (job.status === "running" || job.status === "unavailable") {
             try {
@@ -129,15 +152,40 @@ export class Jobs {
           if (job.notificationError) warnings.push(job.notificationError)
           jobs.push({ ...job })
         }
+        // Foreground calls do not return a shell ID until completion. Correlate
+        // only live native shells owned by this session with a running tool.
+        if (active.length) {
+          let shells = runningByDirectory.get(session.location.directory)
+          if (!shells) {
+            const response = await this.api<{ data: Shell[] }>("/api/shell", { "location[directory]": session.location.directory })
+            shells = response.data
+            runningByDirectory.set(session.location.directory, shells)
+          }
+          const used = new Set<string>()
+          const foreground = new Map<string, Job>()
+          for (const call of active) {
+            const native = shells.find((shell) => shell.status === "running" && shell.metadata.sessionID === session.id &&
+              !history.jobs.has(shell.id) && !used.has(shell.id) && shell.command === call.command &&
+              (call.shellID ? shell.id === call.shellID : call.started > 0 && Math.abs(shell.time.started - call.started) <= 2000))
+            if (!native) continue
+            used.add(native.id)
+            const job: Job = { id: native.id, sessionID: session.id, sessionTitle: session.title ?? session.id,
+              directory: session.location.directory, command: native.command, monitored: false, foreground: true,
+              status: "running", started: native.time.started, file: native.file, cwd: native.cwd, retained: true }
+            foreground.set(job.id, job)
+            jobs.push({ ...job })
+          }
+          this.foreground.set(session.id, foreground)
+        }
       } catch (error) { warnings.push(`${session.title ?? session.id}: ${String(error)}`) }
     }
-    return { jobs: jobs.sort((a, b) => Number(b.status === "running") - Number(a.status === "running") || Number(b.monitored) - Number(a.monitored) || b.started - a.started), sessions: sessions.length, warnings }
+    return { jobs: jobs.sort((a, b) => Number(b.status === "running") - Number(a.status === "running") || Number(b.monitored) - Number(a.monitored) || b.started - a.started), sessions: sessions.length, warnings, foregroundSupported: true }
   }
 
   private async owned(root: string, id: string) {
     const sessionIDs = new Set((await this.tree(root)).map((s) => s.id))
     for (const sessionID of sessionIDs) {
-      const job = this.histories.get(sessionID)?.jobs.get(id)
+      const job = this.histories.get(sessionID)?.jobs.get(id) ?? this.foreground.get(sessionID)?.get(id)
       if (job) return job
     }
     throw new ApiError(404, "Job is not in this session tree. Refresh the panel.")
@@ -153,6 +201,7 @@ export class Jobs {
 
   async stop(root: string, id: string, actor: "human" | "agent" = "agent") {
     const job = await this.owned(root, id)
+    if (job.foreground) throw new ApiError(409, "Foreground commands are controlled by their owning agent and cannot be cancelled from this panel.")
     const query = { "location[directory]": job.directory }
     const { data } = await this.api<{ data: Shell }>(`/api/shell/${id}`, query)
     if (data.metadata.sessionID !== job.sessionID) throw new ApiError(404, "Job belongs to a different session.")

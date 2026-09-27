@@ -7,14 +7,16 @@ const root = document.querySelector<HTMLElement>("#jobs")!
 const summary = document.querySelector<HTMLElement>("#summary")!
 const notice = document.querySelector<HTMLElement>("#notice")!
 const automatic = document.querySelector<HTMLButtonElement>("#auto")!
+const foregroundToggle = document.querySelector<HTMLButtonElement>("#foreground")!
 let sessionID: string | null = null
 let generation = 0
 let collapsed = new Set<string>()
 let autoCollapse = false
+let showForeground = true
 let ready = false
 let busy = false
 let currentJobs: Job[] = []
-type Card = { element: HTMLElement; title: HTMLButtonElement; state: HTMLElement; age: HTMLElement; owner: HTMLElement; badge: HTMLElement; stop: HTMLButtonElement; body: HTMLElement; output: HTMLElement; cursor: number; text: string; complete: boolean; loading: boolean; job: Job }
+type Card = { element: HTMLElement; title: HTMLButtonElement; state: HTMLElement; age: HTMLElement; owner: HTMLElement; badge: HTMLElement; foregroundBadge: HTMLElement; stop: HTMLButtonElement; body: HTMLElement; output: HTMLElement; cursor: number; text: string; complete: boolean; loading: boolean; job: Job }
 const cards = new Map<string, Card>()
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text = ""): HTMLElementTagNameMap[K] {
@@ -55,10 +57,12 @@ function makeCard(job: Job): Card {
   const age = element("span", "elapsed")
   const badge = element("span", "monitor-badge", "MONITOR")
   badge.title = "Launched with monitor: true. Line notifications can stop at the plugin's limit; the process may still be running."
+  const foreground = element("span", "foreground-badge", "FOREGROUND")
+  foreground.title = "A foreground command currently running in this session or a subagent. Its agent is waiting for the tool to finish."
   const stop = element("button", "stop-control", "Cancel job")
   stop.title = "Cancel this running command. OpenCode also removes its retained output."
   stop.setAttribute("aria-label", `Cancel job: ${title.textContent}`)
-  line.append(state, age, badge, stop)
+  line.append(state, age, badge, foreground, stop)
   const owner = element("div", "owner")
   header.append(title, line, owner)
   const body = element("div")
@@ -71,7 +75,7 @@ function makeCard(job: Job): Card {
   details.append(element("summary", "", "Details"), list)
   body.append(element("pre", "program", job.command), element("div", "output-header", "Live output · stdout + stderr"), output, details)
   article.append(header, body)
-  const card: Card = { element: article, title, state, age, owner, badge, stop, body, output, cursor: 0, text: "", complete: false, loading: false, job }
+  const card: Card = { element: article, title, state, age, owner, badge, foregroundBadge: foreground, stop, body, output, cursor: 0, text: "", complete: false, loading: false, job }
   title.onclick = () => { if (collapsed.has(job.id)) collapsed.delete(job.id); else collapsed.add(job.id); fold(card); persist(); void readOutput(card) }
   stop.onclick = async () => {
     const selected = sessionID
@@ -109,7 +113,8 @@ function paint(jobs: Job[]) {
     card.owner.textContent = `Subagent: ${job.sessionTitle}`
     card.owner.title = job.sessionID
     card.badge.hidden = !job.monitored
-    card.stop.hidden = !running
+    card.foregroundBadge.hidden = !job.foreground
+    card.stop.hidden = !running || job.foreground === true
     fold(card)
     // Keyed DOM preserves open details, output selection, scroll, and focus.
     const desiredIndex = jobs.indexOf(job)
@@ -149,15 +154,28 @@ async function refresh() {
     const result = await request<Snapshot>("/jobs", { session: selected })
     if (version !== generation) return
     currentJobs = result.jobs
-    paint(currentJobs)
-    const active = currentJobs.filter((j) => j.status === "running")
-    summary.textContent = `${active.length} running · ${active.filter((j) => j.monitored).length} monitored · ${result.sessions} session${result.sessions === 1 ? "" : "s"} (including subagents)`
-    if (!currentJobs.length) summary.textContent += " · No background jobs yet."
-    showNotice(result.warnings.join("\n"))
-    await Promise.all([...cards.values()].map(readOutput))
+    currentSessions = result.sessions
+    render(result.sessions)
+    showNotice([...result.warnings, ...(result.foregroundSupported === true ? [] : ["This extension's service is still running an older build. Disable and re-enable the extension in OpenChamber Settings → Extensions, then reload this panel to see foreground jobs."])].join("\n"))
   } catch (error) { if (version === generation) showNotice(String(error)) }
   finally { busy = false }
 }
+function render(sessions: number) {
+  const visible = currentJobs.filter((job) => showForeground || !job.foreground)
+  paint(visible)
+  const active = visible.filter((job) => job.status === "running")
+  const foregroundCount = currentJobs.filter((job) => job.foreground).length
+  summary.textContent = `${active.length} running · ${active.filter((job) => job.monitored).length} monitored · ${foregroundCount} foreground${showForeground ? "" : " hidden"} · ${sessions} session${sessions === 1 ? "" : "s"} (including subagents)`
+  if (!visible.length) summary.textContent += " · No visible jobs."
+  void Promise.all([...cards.values()].map(readOutput))
+}
+foregroundToggle.onclick = () => {
+  showForeground = !showForeground
+  foregroundToggle.setAttribute("aria-pressed", String(showForeground))
+  void host.storage.set("show-foreground", showForeground).catch((e) => showNotice(String(e)))
+  render(currentSessions)
+}
+let currentSessions = 0
 document.querySelector<HTMLButtonElement>("#expand")!.onclick = () => { collapsed.clear(); cards.forEach(fold); persist() }
 document.querySelector<HTMLButtonElement>("#collapse")!.onclick = () => { collapsed = new Set(cards.keys()); cards.forEach(fold); persist() }
 automatic.onclick = () => {
@@ -174,17 +192,20 @@ host.onSession((session) => {
   const version = ++generation
   ready = false
   currentJobs = []
+  currentSessions = 0
   cards.clear()
   root.replaceChildren()
   collapsed.clear()
   showNotice("")
   summary.textContent = next ? "Loading session tree…" : "Open a conversation to see its jobs."
   if (!next) return
-  void Promise.all([host.storage.get(`collapsed:${next}`), host.storage.get("auto-collapse")]).then(([closed, auto]) => {
+  void Promise.all([host.storage.get(`collapsed:${next}`), host.storage.get("auto-collapse"), host.storage.get("show-foreground")]).then(([closed, auto, foreground]) => {
     if (version !== generation) return
     collapsed = new Set(Array.isArray(closed) ? closed.filter((s): s is string => typeof s === "string") : [])
     autoCollapse = auto === true
     automatic.setAttribute("aria-pressed", String(autoCollapse))
+    showForeground = foreground !== false
+    foregroundToggle.setAttribute("aria-pressed", String(showForeground))
   }).catch((e) => { if (version === generation) showNotice(String(e)) }).finally(() => {
     if (version !== generation) return
     ready = true
