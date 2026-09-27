@@ -14,9 +14,9 @@ button:disabled { cursor: default; opacity: .5; }
 button[aria-pressed="true"] { color: var(--oc-primary-text, #345fa5); background: color-mix(in srgb, var(--oc-primary, #5080dd) 15%, transparent); }
 #jobs { flex: 1; min-height: 0; display: grid; grid-auto-rows: max-content; align-content: start; gap: 9px; overflow-y: auto; }
 .job { min-width: 0; overflow: hidden; border: 1px solid var(--oc-border, #d5d8df); border-radius: 7px; background: var(--oc-elevated, #f0f5fb); }
-.job.monitored { border-left: 4px solid var(--oc-warning, #b78222); }
+.job.running { border-left: 4px solid var(--oc-info-text, #3e7295); }
 .card-header { padding: 10px 12px; }
-.task-summary { display: block; width: 100%; padding: 0 20px 5px 0; border: 0; text-align: left; font-size: 13px; font-weight: 600; position: relative; overflow-wrap: anywhere; }
+.task-summary { display: block; width: 100%; padding: 0 20px 5px 0; border: 0; text-align: left; font-size: 13px; font-weight: 600; position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .task-summary::after { content: ""; position: absolute; top: 5px; right: 3px; width: 7px; height: 7px; border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; opacity: .6; transform: rotate(45deg); }
 .task-summary[aria-expanded="false"]::after { transform: rotate(-45deg); }
 .status-line { font: 11px var(--oc-mono, monospace); gap: 6px 9px; }

@@ -105,7 +105,8 @@ function paint(jobs: Job[]) {
     card.element.className = `job ${tone}${job.monitored ? " monitored" : ""}`
     card.state.textContent = running ? "Running" : job.status === "exited" ? `Exited ${job.exit ?? "?"}` : job.status === "timeout" ? "Timed out" : job.status === "killed" ? job.cancelledBy ? `Cancelled by ${job.cancelledBy}` : "Stopped" : "Record unavailable"
     card.age.textContent = running || job.completed ? duration((job.completed ?? Date.now()) - job.started) : ""
-    card.owner.textContent = `${job.sessionID === sessionID ? "This session" : "Subagent"}: ${job.sessionTitle}`
+    card.owner.hidden = job.sessionID === sessionID
+    card.owner.textContent = `Subagent: ${job.sessionTitle}`
     card.owner.title = job.sessionID
     card.badge.hidden = !job.monitored
     card.stop.hidden = !running

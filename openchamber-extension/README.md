@@ -6,7 +6,7 @@ The companion panel for `opencode-monitor`, adapted from `opencode-perk`'s V1 vi
 
 - Shell calls launched with `background: true` in the selected session and every descendant linked by `parentID`, across their project directories.
 - Running jobs first, with monitored jobs first within that group.
-- An amber edge and **MONITOR** badge for `monitor: true`. This means monitoring was requested at launch, not that notifications are still active: the monitor plugin may reach its line limit while the process keeps running.
+- A colored edge for running jobs, whether monitored or not. The **MONITOR** badge marks `monitor: true`: monitoring was requested at launch, but notifications may stop at the plugin's line limit while the process keeps running.
 - Command, elapsed time, owning session, exit status, expandable details, and combined stdout/stderr.
 - Expand/collapse controls and per-session collapse storage. Auto-collapse closes ordinary completed jobs, keeping monitored jobs visible.
 - A **Cancel job** button in each running card's header, including collapsed cards, routed through OpenCode's native shell removal operation with session-tree and native-owner checks.
