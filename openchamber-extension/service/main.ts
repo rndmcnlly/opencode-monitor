@@ -1,28 +1,64 @@
 import { createServer } from "node:http"
-import { readFile } from "node:fs/promises"
+import { readFile, mkdir, rename, writeFile } from "node:fs/promises"
 import { homedir } from "node:os"
 import { join } from "node:path"
 import { ApiError, Jobs, type Api, type Snapshot } from "../jobs.js"
+import { discoverBackend } from "./discover.js"
 
 const port = Number(process.env.OPENCHAMBER_SERVICE_PORT)
 const token = process.env.OPENCHAMBER_SERVICE_TOKEN
 if (!port || !token) throw new Error("OpenChamber service port and token are required")
 let connectionKey = ""
+const connectionFile = join(homedir(), ".config/opencode-monitor/connection.json")
+let connection: { url: string; headers?: Record<string, string> }
 let jobs: Jobs
+let reconnecting: Promise<void> | undefined
 const snapshots = new Map<string, { at: number; promise: Promise<Snapshot> }>()
+
+async function reconnect() {
+  reconnecting ??= (async () => {
+    const next = await discoverBackend()
+    await mkdir(join(homedir(), ".config/opencode-monitor"), { recursive: true, mode: 0o700 })
+    const temporary = `${connectionFile}.${process.pid}.tmp`
+    await writeFile(temporary, JSON.stringify(next), { mode: 0o600 })
+    await rename(temporary, connectionFile)
+    connection = next
+    connectionKey = ""
+    snapshots.clear()
+  })().finally(() => { reconnecting = undefined })
+  await reconnecting
+}
 
 async function connected() {
   let raw: string
-  try { raw = await readFile(join(homedir(), ".config/opencode-monitor/connection.json"), "utf8") }
-  catch { throw new ApiError(503, "Run npm run connect:openchamber from this checkout inside OpenChamber.") }
+  try { raw = await readFile(connectionFile, "utf8") }
+  catch {
+    try { await reconnect(); raw = await readFile(connectionFile, "utf8") }
+    catch { throw new ApiError(503, "Run npm run connect:openchamber from this checkout inside OpenChamber.") }
+  }
   if (raw !== connectionKey) {
-    const connection = JSON.parse(raw) as { url: string; headers?: Record<string, string> }
+    connection = JSON.parse(raw) as { url: string; headers?: Record<string, string> }
     const api: Api = async <T>(path: string, query = {}, method = "GET", body?: unknown) => {
-      const url = new URL(path, connection.url)
-      url.search = new URLSearchParams(query).toString()
+      const request = () => {
+        const url = new URL(path, connection.url)
+        url.search = new URLSearchParams(query).toString()
+        return fetch(url, { method, headers: { ...connection.headers, ...(body === undefined ? {} : { "Content-Type": "application/json" }) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10_000) })
+      }
       let response: Response
-      try { response = await fetch(url, { method, headers: { ...connection.headers, ...(body === undefined ? {} : { "Content-Type": "application/json" }) }, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10_000) }) }
-      catch { throw new ApiError(503, "OpenCode backend unavailable. Re-run npm run connect:openchamber after an OpenChamber restart.") }
+      try { response = await request() }
+      catch {
+        if (method !== "GET") throw new ApiError(503, "OpenCode backend unavailable. Retry after reconnecting OpenChamber.")
+        try { await reconnect() }
+        catch { throw new ApiError(503, "OpenCode backend unavailable. Run npm run connect:openchamber inside OpenChamber.") }
+        try { response = await request() }
+        catch { throw new ApiError(503, "OpenCode backend unavailable after reconnecting OpenChamber.") }
+      }
+      if (method === "GET" && (response.status === 401 || response.status === 403)) {
+        try { await reconnect() }
+        catch { throw new ApiError(503, "OpenCode backend unavailable. Run npm run connect:openchamber inside OpenChamber.") }
+        try { response = await request() }
+        catch { throw new ApiError(503, "OpenCode backend unavailable after reconnecting OpenChamber.") }
+      }
       if (!response.ok) throw new ApiError(response.status, `OpenCode ${path}: HTTP ${response.status}`)
       return (response.status === 204 ? undefined : await response.json()) as T
     }

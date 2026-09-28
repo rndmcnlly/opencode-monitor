@@ -37,7 +37,7 @@ The connection helper uses the active OpenChamber environment to identify and ve
 
 In **Settings → Extensions → Add**, choose the absolute path of this `openchamber-extension` directory. Allow the local service and open **Background jobs** on the right-hand rail. If an already-open app has not picked up the new rail icon, reload its UI.
 
-**After OpenChamber restarts or changes its backend**, rerun `npm run connect:openchamber`. The service rereads the connection file on requests. This proof of concept selects one OpenChamber backend per OS user. It does not silently fall back to the standalone OpenCode service, which may be a different process with different live jobs.
+**After OpenChamber restarts or changes its backend**, the service reconnects on the next failed read. On macOS it checks OpenChamber's managed-backend registry, prefers the backend owned by the current host, reads that backend's process password, and verifies its PID through `/api/info` before replacing the private connection file. If it cannot verify exactly one backend, run `npm run connect:openchamber` inside the intended OpenChamber instance. It never falls back to the standalone OpenCode service, which may be a different process with different live jobs. On other platforms, rerun the connection command after a restart.
 
 Rebuild after edits with `npm run build:extension`. Reload the panel for frontend edits; disable and re-enable the extension for service edits. Reloading the web view alone does not restart the service; the panel now warns when its service predates foreground-job support. Bundles are generated locally and gitignored. A distributed archive must include both built `main.js` files.
 
