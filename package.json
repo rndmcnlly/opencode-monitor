@@ -18,5 +18,22 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.9.3"
+  },
+  "openchamber": {
+    "apiVersion": 1,
+    "engines": { "openchamber": ">=2.0.0" },
+    "contributes": {
+      "panel": {
+        "id": "opencode-monitor",
+        "name": "Background jobs",
+        "icon": "service-bell",
+        "entry": "openchamber-extension/panel/index.html"
+      },
+      "service": {
+        "entry": "openchamber-extension/service/main.js",
+        "runtime": "host",
+        "permissions": { "exec": ["ps"] }
+      }
+    }
   }
 }

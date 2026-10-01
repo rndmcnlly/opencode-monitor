@@ -41,15 +41,7 @@ Cancelling from the panel explicitly tells the agent that a human cancelled the 
 
 *Example jobs in the optional OpenChamber panel. Representative of the experience; the latest version may look different.*
 
-From this checkout, ask an agent inside OpenChamber to run:
-
-```sh
-npm --prefix openchamber-extension install
-npm run build:extension
-npm run connect:openchamber
-```
-
-Then add `openchamber-extension/` in **Settings → Extensions** and allow its local service. See the [extension README](./openchamber-extension/README.md) for connection and lifecycle details.
+To install it, paste `https://github.com/rndmcnlly/opencode-monitor` in **Settings → Extensions** and allow its local service. On the macOS desktop app it connects to OpenCode by itself; elsewhere, ask an agent inside OpenChamber to run `npm run connect:openchamber` from a checkout. See the [extension README](./openchamber-extension/README.md) for connection and lifecycle details.
 
 The extension is entirely optional. The OpenCode plugin has no OpenChamber imports, runtime dependency, or connection requirement. Root `npm install`, `npm run check`, and `npm test` develop and verify only the standalone plugin. The extension has its own dependencies, lockfile, checks, and tests under `openchamber-extension/`.
 

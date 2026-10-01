@@ -18,16 +18,11 @@ The panel works for ordinary background shells without the monitor plugin. The p
 
 The OpenCode plugin also works without this extension or OpenChamber. There are no imports from the plugin into this extension or from the extension into the plugin. This directory owns its development dependencies and lockfile; the root plugin's install, checks, and tests do not build or load OpenChamber code.
 
-## Install from this checkout
+## Install
 
-Run from the repository root:
+In **Settings → Extensions**, paste `https://github.com/rndmcnlly/opencode-monitor` and choose **Add**. Allow the local service and open **Background jobs** on the right-hand rail. The repository ships the built panel and service, so nothing has to run first. The manifest lives in the root `package.json`, because OpenChamber reads it from the top of the repository; its paths point into this directory.
 
-```sh
-npm --prefix openchamber-extension install
-npm run check:extension
-```
-
-Then have an agent **inside the OpenChamber instance you use** run:
+On the macOS desktop app the service finds its OpenCode backend on its own (see below). Elsewhere, have an agent **inside the OpenChamber instance you use** run this from a checkout:
 
 ```sh
 npm run connect:openchamber
@@ -35,11 +30,20 @@ npm run connect:openchamber
 
 The connection helper uses the active OpenChamber environment to identify and verify its OpenCode backend. It writes a private `~/.config/opencode-monitor/connection.json` containing the backend URL and authentication headers. Credentials stay outside this package and its iframe.
 
-In **Settings → Extensions → Add**, choose the absolute path of this `openchamber-extension` directory. Allow the local service and open **Background jobs** on the right-hand rail. If an already-open app has not picked up the new rail icon, reload its UI.
+### From a checkout
+
+For development, run from the repository root:
+
+```sh
+npm --prefix openchamber-extension install
+npm run check:extension
+```
+
+Then in **Settings → Extensions → Add**, choose the absolute path of the repository root. A folder install runs straight from your checkout. If an already-open app has not picked up the new rail icon, reload its UI.
 
 **After OpenChamber restarts or changes its backend**, the service reconnects on the next failed read. On macOS it checks OpenChamber's managed-backend registry, prefers the backend owned by the current host, reads that backend's process password, and verifies its PID through `/api/info` before replacing the private connection file. If it cannot verify exactly one backend, run `npm run connect:openchamber` inside the intended OpenChamber instance. It never falls back to the standalone OpenCode service, which may be a different process with different live jobs. On other platforms, rerun the connection command after a restart.
 
-Rebuild after edits with `npm run build:extension`. Reload the panel for frontend edits; disable and re-enable the extension for service edits. Reloading the web view alone does not restart the service; the panel now warns when its service predates foreground-job support. Bundles are generated locally and gitignored. A distributed archive must include both built `main.js` files.
+Rebuild after edits with `npm run build:extension`. Reload the panel for frontend edits; disable and re-enable the extension for service edits. Reloading the web view alone does not restart the service; the panel now warns when its service predates foreground-job support. The built `panel/main.js` and `service/main.js` are committed, because OpenChamber installs straight from the repository and never builds anything. Commit them together with source changes. Git installs offer **Update** when the root `package.json` version goes up, so bump it to ship a new version.
 
 ## V1 versus V2
 
