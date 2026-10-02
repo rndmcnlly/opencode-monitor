@@ -31,11 +31,11 @@ Foreground `shell` calls lasting more than 10 seconds get a short runtime note i
 
 ## Optional OpenChamber Jobs panel
 
-The former companion panel has moved into **[openchamber-jobs](../openchamber-jobs/README.md)**, an independently useful OpenChamber extension. It shows native shell jobs, live output, status, and ownership across a conversation and its subagents, and lets humans cancel background jobs with an explicit notice to the agent.
+The former companion panel has moved into **[openchamber-jobs](https://github.com/rndmcnlly/openchamber-jobs)**, an independently useful OpenChamber extension. It shows native shell jobs, live output, status, and ownership across a conversation and its subagents, and lets humans cancel background jobs with an explicit notice to the agent.
 
 The two packages work independently: `opencode-monitor` delivers incremental output notifications without OpenChamber; `openchamber-jobs` visualizes ordinary native jobs without the monitor plugin. Together, the panel recognizes recorded `monitor: true` inputs, adds a **MONITOR** badge, and keeps monitored jobs expanded during auto-collapse.
 
-Install Jobs from a locally built checkout or a ready-to-run release ZIP. Its GitHub Actions workflow builds release archives without committing generated JavaScript. The new repository is currently local and unpublished; the link above points to the sibling checkout. No OpenChamber code, dependencies, or build steps remain in this plugin package.
+Install Jobs from a locally built checkout or a ready-to-run release ZIP when available. Its GitHub Actions workflow builds release archives without committing generated JavaScript. No OpenChamber code, dependencies, or build steps remain in this plugin package.
 
 ## Historical context
 
