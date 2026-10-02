@@ -29,29 +29,13 @@ Each line of output becomes an update in the conversation. Filter noisy commands
 
 Foreground `shell` calls lasting more than 10 seconds get a short runtime note in their tool result. The first call exceeding 30 seconds in each session also gets a tip suggesting `background: true` for similar commands and `monitor: true` for live progress updates. Subsequent calls report only their runtime. This applies whether `background` was omitted or explicitly false; background calls receive neither. Tip tracking lasts for the plugin instance's lifetime.
 
-## OpenChamber background-jobs panel
+## Optional OpenChamber Jobs panel
 
-The optional [OpenChamber extension](./openchamber-extension/README.md) brings back Perk's job cards for V2. It shows background shell jobs in the current session and its recursive subagent sessions, including jobs without `monitor: true`. It can also show running foreground shell commands in the selected session and its subagents, controlled by the **Foreground** toggle in the panel header. Monitored jobs have a **MONITOR** badge, so long-lived watches are easy to find and stop.
+The former companion panel has moved into **[openchamber-jobs](../openchamber-jobs/README.md)**, an independently useful OpenChamber extension. It shows native shell jobs, live output, status, and ownership across a conversation and its subagents, and lets humans cancel background jobs with an explicit notice to the agent.
 
-Cards show status, elapsed time, owning session, combined live output, and a Cancel job button that remains accessible on collapsed cards. Completed jobs are recovered from session history when the panel opens. Collapse preferences are saved per session; auto-collapse leaves monitored jobs expanded.
+The two packages work independently: `opencode-monitor` delivers incremental output notifications without OpenChamber; `openchamber-jobs` visualizes ordinary native jobs without the monitor plugin. Together, the panel recognizes recorded `monitor: true` inputs, adds a **MONITOR** badge, and keeps monitored jobs expanded during auto-collapse.
 
-Cancelling from the panel explicitly tells the agent that a human cancelled the job, with an instruction not to restart it automatically. For subagent jobs, both the owning session and the session whose panel you used receive the notice. The card retains **Cancelled by human** using that recorded provenance.
-
-<a href="./demo/openchamber-background-jobs.png"><img src="./demo/openchamber-background-jobs.png" alt="Optional OpenChamber panel showing an amber-marked monitored job with live output alongside a completed job" width="500"></a>
-
-*Example jobs in the optional OpenChamber panel. Representative of the experience; the latest version may look different.*
-
-From this checkout, ask an agent inside OpenChamber to run:
-
-```sh
-npm --prefix openchamber-extension install
-npm run build:extension
-npm run connect:openchamber
-```
-
-Then add `openchamber-extension/` in **Settings → Extensions** and allow its local service. See the [extension README](./openchamber-extension/README.md) for connection and lifecycle details.
-
-The extension is entirely optional. The OpenCode plugin has no OpenChamber imports, runtime dependency, or connection requirement. Root `npm install`, `npm run check`, and `npm test` develop and verify only the standalone plugin. The extension has its own dependencies, lockfile, checks, and tests under `openchamber-extension/`.
+Install Jobs from a locally built checkout or a ready-to-run release ZIP. Its GitHub Actions workflow builds release archives without committing generated JavaScript. The new repository is currently local and unpublished; the link above points to the sibling checkout. No OpenChamber code, dependencies, or build steps remain in this plugin package.
 
 ## Historical context
 
